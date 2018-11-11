@@ -1,52 +1,59 @@
 package net.ickis.rencode
 
-import net.ickis.rencode.types.*
-import java.io.Closeable
+import net.ickis.rencode.types.SupportedType
 import java.io.EOFException
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
 
-/**
- * An [InputStream] for reading the "rencoded" objects.
- */
 class RencodeInputStream @JvmOverloads constructor(
-        private val stream: InputStream,
+        stream: InputStream,
         val charset: Charset = Charset.forName("UTF-8")
-): InputStream() {
-    fun readObject(): Any? = readObject(readToken())
+): FilterInputStream(stream) {
+    fun readByte(): Byte = readType(SupportedType.BYTE)
 
-    fun readByte(): Byte = readType()
+    fun readShort(): Short = readType(SupportedType.SHORT)
 
-    fun readShort(): Short = readType()
+    fun readInt(): Int = readType(SupportedType.INT)
 
-    fun readInt(): Int = readType()
+    fun readLong(): Long = readType(SupportedType.LONG)
 
-    fun readLong(): Long = readType()
+    fun readFloat(): Float = readType(SupportedType.FLOAT)
 
-    fun readFloat(): Float = readType()
+    fun readDouble(): Double = readType(SupportedType.DOUBLE)
 
-    fun readDouble(): Double = readType()
+    fun readBoolean(): Boolean = readType(SupportedType.BOOLEAN)
 
-    fun readBoolean(): Boolean = readType()
+    fun readString(): String = readType(SupportedType.STRING)
 
-    fun readString(): String = readType()
+    fun readList(): List<*> = readType(SupportedType.COLLECTION)
 
-    fun readList(): List<*> = readType()
+    fun readMap(): Map<*, *> = readType(SupportedType.MAP)
 
-    fun readMap(): Map<*, *> = readType()
+    fun readNumber(): Number = readType(SupportedType.NUMBER)
 
-    fun readNumber(): Number = readType()
+    fun readObject(): Any? {
+        return readObject(readToken())
+    }
 
-    override fun read() = stream.read()
+    private fun <T: Any> readType(type: SupportedType): T {
+        val token = readToken()
+        val tokenType = type.parseId(token)
+                ?: throw IOException("Unexpected token $token for $type")
+        @Suppress("UNCHECKED_CAST")
+        return tokenType.read(this, token) as T
+    }
 
     internal fun readToken(): Int {
-        return stream.read().takeIf { it != -1 } ?: throw EOFException()
+        return read().takeIf { it != -1 } ?: throw EOFException()
     }
 
     internal fun readObject(token: Int): Any? {
-        return getTokenType(token).read(this, token)
+        val tokenType = SupportedType.findById(token)
+                ?: throw IOException("No mapping found for token $token")
+        return tokenType.read(this, token)
     }
 
     internal fun readToBuffer(size: Int) = ByteBuffer.wrap(readBytes(size))
@@ -57,52 +64,11 @@ class RencodeInputStream @JvmOverloads constructor(
             throw IndexOutOfBoundsException()
         var n = 0
         while (n < len) {
-            val count = stream.read(array, n, len - n)
+            val count = read(array, n, len - n)
             if (count < 0)
                 throw EOFException()
             n += count
         }
         return array
-    }
-
-    private inline fun <reified T, reified C: TokenType<T>> readType(): T {
-        val token = readToken()
-        return when (val type = getTokenType(token)) {
-            is C -> type.read(this, token)!!
-            else -> throw IOException()
-        }
-    }
-
-    private fun getTokenType(token: Int) = SupportedTypes.get(token)
-
-    internal object SupportedTypes {
-        internal val idMap: Map<Int, IdType<out Any>> = listOf(
-                DoubleType,
-                LargeListType,
-                LargeMapType,
-                BigNumberType,
-                ByteType,
-                ShortType,
-                IntType,
-                LongType,
-                FloatType,
-                TrueType,
-                FalseType,
-                NullType,
-                EndType
-        ).associateBy({ k -> k.id }, { k -> k })
-
-        internal val rangeList = listOf(
-                PositiveIntType,
-                NegativeIntType,
-                LargeStringType,
-                StringType,
-                ListType,
-                MapType
-        )
-
-        fun get(token: Int): TokenType<out Any> = idMap[token]
-                ?: rangeList.find { token in it.range }
-                ?: throw IOException("Unsupported token $token")
     }
 }

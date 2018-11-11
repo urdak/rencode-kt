@@ -1,10 +1,9 @@
 package net.ickis.rencode
 
 import net.ickis.rencode.types.*
-import org.junit.Assert
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
@@ -12,6 +11,7 @@ import java.io.IOException
 import java.math.BigDecimal
 import java.math.BigInteger
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RencodeTest {
     private fun assertEncodeDecode(expectedObject: Any?, expectedByteArray: ByteArray) {
         val baos = ByteArrayOutputStream()
@@ -270,14 +270,14 @@ class RencodeTest {
         ros.writeObject(BooleanArray(size))
 
         val ris = RencodeInputStream(ByteArrayInputStream(out.toByteArray()))
-        Assert.assertEquals(generateSequence { 0.toByte() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0.toByte() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0.toShort() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0 }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0.toLong() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0.toFloat() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { 0.toDouble() }.take(5).toList(), ris.readObject())
-        Assert.assertEquals(generateSequence { false }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toByte() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toByte() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toShort() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0 }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toLong() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toFloat() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { 0.toDouble() }.take(5).toList(), ris.readObject())
+        assertEquals(generateSequence { false }.take(5).toList(), ris.readObject())
     }
 
     @Test
@@ -316,22 +316,58 @@ class RencodeTest {
 
     @Test
     fun `All registered tokens have unique IDs`() {
-        val registeredIds = RencodeInputStream.SupportedTypes.idMap.values
-        val registeredRanges = RencodeInputStream.SupportedTypes.rangeList
-        registeredRanges.forEach { range ->
-            val rangeIntersections = registeredRanges
-                    .filter { it !== range }
-                    .filter { it.range.start in range.range }
-                    .filter { it.range.endInclusive in range.range }
-            Assert.assertTrue("$range intersects with $rangeIntersections", rangeIntersections.isEmpty())
-            val idIntersections = registeredIds.filter { it.id in range.range }
-            Assert.assertTrue("$range intersects with $idIntersections", idIntersections.isEmpty())
+        SupportedType.values().forEach { outer ->
+            SupportedType.values().filter { outer != it }.forEach { inner ->
+                outer.readTokens.forEach { token ->
+                    when (token) {
+                        is IdType -> assertNull(inner.parseId(token.id), "$outer intersects with $inner on ${token.id}")
+                        is RangeType -> token.range.forEach {
+                            assertNull(inner.parseId(it), "$outer intersects with $inner on $it")
+                        }
+                    }
+                }
+            }
         }
     }
 
-    @Test(expected = IOException::class)
+    @Test
     fun `Unknown Type cannot be serialized`() {
-        RencodeOutputStream(ByteArrayOutputStream()).writeObject(0..1)
+        assertThrows(IOException::class.java) {
+            RencodeOutputStream(ByteArrayOutputStream()).writeObject(0..1)
+        }
+    }
+
+    @Test
+    fun `Number supports all standard number types`() {
+        val byte = 5.toByte()
+        val short = 5.toShort()
+        val int = 5
+        val long = 5L
+        val float = 5F
+        val double = 5.0
+        val bigDecimal = BigDecimal("5.55")
+        val bigInteger = BigInteger("555")
+        val baos = ByteArrayOutputStream()
+        RencodeOutputStream(baos).use {
+            it.writeNumber(byte)
+            it.writeNumber(short)
+            it.writeNumber(int)
+            it.writeNumber(long)
+            it.writeNumber(float)
+            it.writeNumber(double)
+            it.writeNumber(bigDecimal)
+            it.writeNumber(bigInteger)
+        }
+        RencodeInputStream(ByteArrayInputStream(baos.toByteArray())).use {
+            assertEquals(byte, it.readNumber())
+            assertEquals(short, it.readNumber())
+            assertEquals(int, it.readNumber())
+            assertEquals(long, it.readNumber())
+            assertEquals(float, it.readNumber())
+            assertEquals(double, it.readNumber())
+            assertEquals(bigDecimal, it.readNumber())
+            assertEquals(bigInteger, it.readNumber())
+        }
     }
 
     @Test
@@ -362,17 +398,17 @@ class RencodeTest {
             it.writeNumber(number)
         }
         RencodeInputStream(ByteArrayInputStream(baos.toByteArray())).use {
-            Assert.assertEquals(byte, it.readByte())
-            Assert.assertEquals(short, it.readShort())
-            Assert.assertEquals(int, it.readInt())
-            Assert.assertEquals(long, it.readLong())
-            Assert.assertEquals(float, it.readFloat())
-            Assert.assertEquals(double, it.readDouble(), 0.0)
-            Assert.assertEquals(bool, it.readBoolean())
-            Assert.assertEquals(str, it.readString())
-            Assert.assertEquals(list, it.readList())
-            Assert.assertEquals(map, it.readMap())
-            Assert.assertEquals(number, it.readNumber())
+            assertEquals(byte, it.readByte())
+            assertEquals(short, it.readShort())
+            assertEquals(int, it.readInt())
+            assertEquals(long, it.readLong())
+            assertEquals(float, it.readFloat())
+            assertEquals(double, it.readDouble())
+            assertEquals(bool, it.readBoolean())
+            assertEquals(str, it.readString())
+            assertEquals(list, it.readList())
+            assertEquals(map, it.readMap())
+            assertEquals(number, it.readNumber())
         }
     }
 }

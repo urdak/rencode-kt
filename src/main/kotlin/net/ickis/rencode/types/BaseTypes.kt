@@ -6,7 +6,7 @@ import net.ickis.rencode.RencodeOutputStream
 /**
  * Type [T] that can be written to a [RencodeOutputStream] and read from a [RencodeInputStream].
  */
-abstract class TokenType<T> {
+sealed class TokenType<T> {
     /**
      * Writes an [obj] to the provided [ros].
      */

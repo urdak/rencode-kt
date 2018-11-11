@@ -22,7 +22,12 @@ publishing {
 
 dependencies {
     compile(kotlin("stdlib"))
-    testCompile("junit:junit:4.12")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.1")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.3.1")
+}
+
+val test by tasks.getting(Test::class) {
+    useJUnitPlatform()
 }
 
 tasks.withType<KotlinCompile> {
