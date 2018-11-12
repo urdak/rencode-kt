@@ -1,6 +1,7 @@
 import com.jfrog.bintray.gradle.BintrayExtension
 import com.jfrog.bintray.gradle.BintrayExtension.PackageConfig
 import com.jfrog.bintray.gradle.BintrayExtension.VersionConfig
+import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 import java.util.Date
@@ -12,16 +13,37 @@ plugins {
     `maven-publish`
     kotlin("jvm") version "1.3.0"
     id("com.jfrog.bintray") version "1.8.4"
+    id("org.jetbrains.dokka") version "0.9.17"
 }
 
 repositories {
     mavenCentral()
 }
 
+val sourcesJar = task<Jar>("sourcesJar") {
+    dependsOn(tasks["classes"])
+    classifier = "sources"
+    from(sourceSets["main"].allSource)
+}
+
+tasks.withType<DokkaTask> {
+    reportUndocumented = false
+    outputFormat = "javadoc"
+    outputDirectory = "$buildDir/javadoc"
+}
+
+val javadocJar = task<Jar>("javadocJar") {
+    dependsOn("dokka")
+    classifier = "javadoc"
+    from(buildDir.resolve("javadoc"))
+}
+
 publishing {
     publications {
         create("mavenJava", MavenPublication::class.java) {
             from(components["java"])
+            artifact(sourcesJar)
+            artifact(javadocJar)
             groupId = "net.ickis"
             artifactId = "rencode-kt"
             version = "1.0"
