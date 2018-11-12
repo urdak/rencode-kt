@@ -20,6 +20,9 @@ repositories {
     mavenCentral()
 }
 
+group = "net.ickis"
+version = "1.0"
+
 val sourcesJar = task<Jar>("sourcesJar") {
     dependsOn(tasks["classes"])
     classifier = "sources"
@@ -45,8 +48,8 @@ publishing {
             artifact(sourcesJar)
             artifact(javadocJar)
             groupId = "net.ickis"
-            artifactId = "rencode-kt"
-            version = "1.0"
+            artifactId = project.name
+            version = project.version.toString()
         }
     }
 }
@@ -62,10 +65,10 @@ bintray {
     key = credentials["bintray.apikey"] as? String
     pkg(closureOf<PackageConfig> {
         repo = "maven"
-        name = "rencode-kt"
+        name = project.name
         setLicenses("MIT")
         version(closureOf<VersionConfig> {
-            name = "1.0"
+            name = project.version.toString()
             released = Date().toString()
         })
         setPublications("mavenJava")
